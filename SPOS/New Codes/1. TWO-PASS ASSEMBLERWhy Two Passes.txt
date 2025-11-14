@@ -1,0 +1,65 @@
+1. TWO-PASS ASSEMBLERWhy Two Passes?The Forward Reference Problem: When assembler reads code line-by-line, it may encounter a jump instruction that references a label defined later in the code. The assembler doesn't know the address yet. Two passes solve this: Pass-I collects all addresses, Pass-II uses them.PASS-I: Symbol Table GenerationMain Tasks:
+
+Build Symbol Table with all labels and their addresses
+Build Literal Table with constants
+Track memory addresses using Location Counter (LC)
+Generate intermediate code
+Key Data Structures:Symbol Table (SYMTAB):
+
+Stores label names and their memory addresses
+Contains information like symbol type, length, and relocatability
+Used in Pass-II to replace symbolic names with actual addresses
+Literal Table (LITTAB):
+
+Stores literals (constants like ='5') with their addresses
+Literals are grouped into pools (ended by LTORG or END)
+Pool Table tracks boundaries of each literal pool
+Location Counter (LC):
+
+Tracks current memory address being processed
+Increments based on instruction size or data declaration size
+Can be modified by directives like START, ORIGIN
+Process Flow:
+
+Read each line sequentially
+If label found, add to SYMTAB with current LC value
+For instructions: increment LC by instruction size
+For data declarations (DS/DC): increment LC by data size
+For literals: add to LITTAB, assign address at pool end
+Generate intermediate code with symbolic references intact
+Error Detection: Duplicate symbols, invalid syntax, undefined directivesPASS-II: Code GenerationMain Tasks:
+
+Use Symbol Table to resolve all symbolic references
+Generate actual machine code (binary/hex)
+Handle relocation information
+Produce output files
+Machine Code Components:
+
+Opcode: Binary code for the operation (from Opcode Table)
+Register codes: Binary codes for registers used
+Memory addresses: Actual addresses from Symbol Table
+Addressing mode: How operand is accessed
+Process Flow:
+
+Read intermediate code from Pass-I
+For each instruction:
+
+Get opcode from Opcode Table
+Replace symbols with addresses from SYMTAB
+Replace literals with addresses from LITTAB
+Generate complete binary instruction
+
+
+Write machine code to output file
+Addressing Modes (Brief):
+
+Immediate: Value directly in instruction
+Direct: Memory address in instruction
+Register: Operand in CPU register
+Indirect: Address points to another address
+Indexed: Base address + offset for arrays
+Output Files:
+
+Object code (machine code)
+Listing file (source + addresses + machine code)
+Error report if any

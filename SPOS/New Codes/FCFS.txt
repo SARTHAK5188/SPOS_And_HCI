@@ -1,0 +1,452 @@
+Line-by-line detailed explanation (every line, every concept)
+
+I will explain the script in the order it appears. I’ll quote each block and then explain the meaning in plain language.
+
+Top docstring / comment
+"""
+Very simple FCFS (First Come First Serve) scheduler
+Non-preemptive, based on arrival time. Menu driven for beginners.
+"""
+
+
+This is a multi-line string at the top of the file. When placed at the top it acts as a module docstring (documentation). It doesn't change program flow. It describes the program: FCFS scheduler, non-preemptive (once a process starts, it runs to completion), scheduling order based on arrival times.
+
+Function definition: run_fcfs
+def run_fcfs():
+
+
+Defines a function named run_fcfs. The following indented block is the function body. Nothing here executes until run_fcfs() is called.
+
+Reading number of processes with validation
+    try:
+        n = int(input("Enter number of processes: ").strip())
+        if n <= 0:
+            print("Number of processes must be positive.")
+            return
+    except ValueError:
+        print("Please enter a valid integer.")
+        return
+
+
+input("Enter number of processes: ") shows the prompt and returns user-typed text.
+
+.strip() removes leading/trailing whitespace (spaces, newline).
+
+int(...) converts the string to an integer; if it fails (user typed letters), Python raises ValueError.
+
+The try block catches that ValueError. If conversion fails, the except runs and the function returns early (no scheduling).
+
+After conversion, code checks if n <= 0: — if user typed zero or negative, it prints a message and return ends the function early. So n must be a positive integer for the function to proceed.
+
+Building the procs list with arrival and burst times
+    procs = []
+    for i in range(n):
+        while True:
+            try:
+                a = int(input(f"Arrival time for P{i}: ").strip())
+                b = int(input(f"Burst time for P{i}: ").strip())
+                if a < 0 or b <= 0:
+                    print("Arrival must be >= 0 and Burst must be > 0. Try again.")
+                    continue
+                break
+            except ValueError:
+                print("Please enter integers for times. Try again.")
+        procs.append({"id": i, "arrival": a, "burst": b})
+
+
+procs = [] creates an empty list to store process information.
+
+for i in range(n): loops n times, i will be 0..n-1. Each iteration collects data for process P{i}.
+
+while True: sets up a loop that repeats until valid input is provided.
+
+Inside try:
+
+a = int(input(f"Arrival time for P{i}: ").strip()) prompts for arrival time and converts to integer.
+
+b = int(input(f"Burst time for P{i}: ").strip()) prompts for burst time (execution time) and converts to integer.
+
+If a < 0 or b <= 0: arrival must be non-negative and burst must be strictly positive. If invalid, print an error and continue restarts the while True loop.
+
+If both are valid, break leaves the while loop.
+
+except ValueError: catches non-integer input and prompts the user to try again.
+
+procs.append({"id": i, "arrival": a, "burst": b}) creates a dictionary for the process with three keys:
+
+"id": the numeric id (i).
+
+"arrival": arrival time (integer).
+
+"burst": CPU burst time (integer).
+This dictionary is appended to the procs list.
+
+Sorting processes by arrival time (stable sort)
+    # sort by arrival time (stable)
+    procs.sort(key=lambda p: p["arrival"])
+
+
+procs.sort(...) sorts the list in-place.
+
+key=lambda p: p["arrival"] tells Python to sort by the "arrival" value of each dictionary.
+
+Python's sort() is stable: if two processes have the same arrival time, their original order (IDs increasing since we appended in order) is preserved. That means tie-breaking is by original index (which is OK for FCFS).
+
+Initialize time & execution order
+    time = 0
+    order = []
+
+
+time = 0 is the scheduler's current time counter (simulation time).
+
+order = [] will record the execution sequence for printing (including idle periods).
+
+Main scheduling loop — compute metrics
+    for p in procs:
+        if time < p["arrival"]:
+            order.append(f"IDLE({p['arrival'] - time})")
+            time = p["arrival"]
+        p_response = time - p["arrival"]
+        order.append(f"P{p['id']}")
+        time += p["burst"]
+        p_completion = time
+        p_turnaround = p_completion - p["arrival"]
+        p_waiting = p_turnaround - p["burst"]
+        # attach metrics to process dict for printing
+        p.update({
+            "completion": p_completion,
+            "turnaround": p_turnaround,
+            "waiting": p_waiting,
+            "response": p_response
+        })
+
+
+This is the scheduling heart. For each process p (already sorted by arrival):
+
+if time < p["arrival"]: — if the CPU is idle until this process arrives:
+
+order.append(f"IDLE({p['arrival'] - time})") — record an idle segment with duration p['arrival'] - time.
+
+time = p["arrival"] — advance simulation time to the process arrival time (CPU remains idle until then).
+
+p_response = time - p["arrival"] — response time (in non-preemptive FCFS) equals the time the process starts minus its arrival time. If the CPU starts the process immediately upon arrival, response is 0.
+
+order.append(f"P{p['id']}") — add the process to the printed execution order.
+
+time += p["burst"] — run the process for its full burst time and advance simulation time by burst.
+
+p_completion = time — completion time is the current time after running the process.
+
+p_turnaround = p_completion - p["arrival"] — turnaround time = completion time − arrival time. This is total time the process spent in the system.
+
+p_waiting = p_turnaround - p["burst"] — waiting time = turnaround − burst (time spent waiting in ready queue).
+
+p.update({...}) — attach metrics to the process dictionary so they can be printed later:
+
+"completion", "turnaround", "waiting", "response".
+
+Important, explicit formula reiteration:
+
+Start time = max(current time, arrival).
+
+Response time = start time − arrival.
+
+Completion time = start time + burst.
+
+Turnaround = completion − arrival.
+
+Waiting = turnaround − burst.
+
+Because this is non-preemptive, once a process starts it will run for its entire burst before another process can start.
+
+Printing the input table
+    print("\nINPUT TABLE")
+    print(f"{'Proc':<6}{'Arrival':<8}{'Burst':<6}")
+    for p in procs:
+        print(f"P{p['id']:<5}{p['arrival']:<8}{p['burst']:<6}")
+
+
+Prints a simple header "INPUT TABLE".
+
+The second print prints column headings aligned: Proc, Arrival, Burst. The formatting codes :<6, :<8 mean left-align within widths 6 and 8 characters respectively.
+
+The for loop prints each process row with the id, arrival, and burst.
+
+Printing execution order (including IDLE segments)
+    print("\nEXECUTION ORDER")
+    print(" -> ".join(order))
+
+
+Joins the order list with " -> " separators and prints it, e.g. IDLE(2) -> P0 -> P1 -> P2.
+
+Printing results table and totals
+    print("\nRESULTS")
+    print(f"{'Proc':<6}{'Comp':<6}{'TAT':<6}{'Wait':<6}{'Resp':<6}")
+    total_comp = total_tat = total_wait = total_resp = 0
+    for p in procs:
+        print(f"P{p['id']:<5}{p['completion']:<6}{p['turnaround']:<6}{p['waiting']:<6}{p['response']:<6}")
+        total_comp += p["completion"]
+        total_tat += p["turnaround"]
+        total_wait += p["waiting"]
+        total_resp += p["response"]
+
+
+Prints a RESULTS header and column names for Process, Completion, Turnaround (TAT), Waiting, Response times.
+
+Initializes totals for each metric to zero using chained assignment.
+
+Loops over processes and prints each metric for that process (which were previously stored in the process dictionary).
+
+Accumulates totals for averages computed later.
+
+Compute and print averages
+    m = len(procs)
+    print("\nAVERAGES")
+    print(f"Average Completion Time : {total_comp / m}")
+    print(f"Average Turnaround Time : {total_tat / m}")
+    print(f"Average Waiting Time    : {total_wait / m}")
+    print(f"Average Response Time   : {total_resp / m}")
+
+
+m = len(procs) is number of processes.
+
+Each average is total divided by m — standard arithmetic mean.
+
+Note: division produces a float value in Python 3. If all numbers are integers but division returns a non-integer, result will be e.g. 12.666666666666666. You can round/format if you prefer.
+
+Build and print a Gantt-like timeline
+    print("\nGANTT TIMELINE")
+    times = []
+    parts = []
+    time = 0
+    for p in procs:
+        if time < p["arrival"]:
+            parts.append("IDLE")
+            times.append(time)
+            time = p["arrival"]
+        parts.append(f"P{p['id']}")
+        times.append(time)
+        time = p["completion"]
+    times.append(time)
+    print(" | ".join(parts))
+    print("  ".join(str(t) for t in times))
+
+
+This prints a simple text Gantt chart: top line lists parts separated by | (e.g., IDLE | P0 | P1).
+
+times list holds the time marks corresponding to the left edge of each part; times.append(time) at the end adds the final completion time so you can see boundaries.
+
+time is reset to 0 and the loop walks through processes, adding IDLE segments and processes with their start time from times and then setting time to the process completion for the next start point.
+
+Finally it prints the times separated by double spaces.
+
+The main_menu function
+def main_menu():
+    while True:
+        print("\n===== FCFS Scheduler =====")
+        print("1. Run FCFS scheduling")
+        print("2. Exit")
+        choice = input("Enter choice (1 or 2): ").strip()
+        if choice == "1":
+            run_fcfs()
+        elif choice == "2":
+            print("Goodbye!")
+            break
+        else:
+            print("Invalid choice. Enter 1 or 2.")
+
+
+Infinite loop showing a small text menu.
+
+choice = input(...).strip() reads user selection.
+
+if choice == "1": run_fcfs() — runs the scheduling function.
+
+elif choice == "2": break — exits the menu.
+
+else prints an error for invalid choices.
+
+Program entry point guard
+if __name__ == "__main__":
+    main_menu()
+
+
+Standard Python idiom: if the script is executed directly, call main_menu(); if it is imported as a module into another script, main_menu() is not called automatically.
+
+Example run: full step-by-step numeric trace (digit-by-digit arithmetic)
+
+I'll show an exact run with small numbers and compute every metric step-by-step, performing each arithmetic operation digit-by-digit so there's no ambiguity.
+
+Choose 3 processes with these inputs (I'll show exactly what you'd type):
+
+Number of processes: 3
+
+For P0:
+
+Arrival time for P0: 0
+
+Burst time for P0: 4
+
+For P1:
+
+Arrival time for P1: 2
+
+Burst time for P1: 3
+
+For P2:
+
+Arrival time for P2: 5
+
+Burst time for P2: 2
+
+So the procs list initially (in order appended) is:
+
+[{"id":0,"arrival":0,"burst":4},
+ {"id":1,"arrival":2,"burst":3},
+ {"id":2,"arrival":5,"burst":2}]
+
+
+They are already sorted by arrival: [0,2,5].
+
+Now we simulate:
+
+Initial time = 0.
+order = [].
+
+Process P0 (p = procs[0] with arrival 0, burst 4):
+
+Check if time < p["arrival"]: 0 < 0 → false, so no IDLE.
+
+p_response = time - p["arrival"] → 0 - 0 = 0.
+
+Digit-by-digit: 0 minus 0 equals 0.
+
+Append P0 to order → order = ["P0"].
+
+time += p["burst"] → time = 0 + 4.
+
+Digit-by-digit: 0 + 4 = 4.
+
+p_completion = time → 4.
+
+p_turnaround = p_completion - p["arrival"] → 4 - 0 = 4.
+
+p_waiting = p_turnaround - p["burst"] → 4 - 4 = 0.
+
+Update P0 dict with completion=4, turnaround=4, waiting=0, response=0.
+
+Process P1 (arrival 2, burst 3), current time = 4:
+
+Check if time < p["arrival"]: 4 < 2 → false, no IDLE.
+
+p_response = time - p["arrival"] → 4 - 2 = 2.
+
+Digit-by-digit: 4 − 2 = 2.
+
+Append P1 to order → order = ["P0", "P1"].
+
+time += p["burst"] → time = 4 + 3.
+
+Digit-by-digit: 4 + 3 = 7.
+
+p_completion = time → 7.
+
+p_turnaround = p_completion - p["arrival"] → 7 - 2 = 5.
+
+Digit-by-digit: 7 − 2 = 5.
+
+p_waiting = p_turnaround - p["burst"] → 5 - 3 = 2.
+
+Update P1 dict with completion=7, turnaround=5, waiting=2, response=2.
+
+Process P2 (arrival 5, burst 2), current time = 7:
+
+Check if time < p["arrival"]: 7 < 5 → false, no IDLE.
+
+p_response = time - p["arrival"] → 7 - 5 = 2.
+
+Append P2 → order = ["P0","P1","P2"].
+
+time += p["burst"] → time = 7 + 2 = 9.
+
+p_completion = 9.
+
+p_turnaround = 9 - 5 = 4.
+
+p_waiting = 4 - 2 = 2.
+
+Update P2 dict with completion=9, turnaround=4, waiting=2, response=2.
+
+Final procs entries with metrics:
+
+P0: arrival 0, burst 4, completion 4, turnaround 4, waiting 0, response 0.
+
+P1: arrival 2, burst 3, completion 7, turnaround 5, waiting 2, response 2.
+
+P2: arrival 5, burst 2, completion 9, turnaround 4, waiting 2, response 2.
+
+Now totals (digit-by-digit):
+
+total_comp = 4 + 7 + 9
+
+Step 1: 4 + 7 = 11.
+
+Step 2: 11 + 9 = 20.
+=> total_comp = 20.
+
+total_tat = 4 + 5 + 4
+
+4 + 5 = 9.
+
+9 + 4 = 13.
+=> total_tat = 13.
+
+total_wait = 0 + 2 + 2
+
+0 + 2 = 2.
+
+2 + 2 = 4.
+=> total_wait = 4.
+
+total_resp = 0 + 2 + 2
+
+0 + 2 = 2.
+
+2 + 2 = 4.
+=> total_resp = 4.
+
+Number of processes m = 3.
+
+Averages (exact division):
+
+Average Completion Time = total_comp / m = 20 / 3.
+
+20 divided by 3 = 6 remainder 2; as a float it's 6.666666666666667 in Python. If you want 6.67, you can format to two decimal places. But the script prints the raw division result.
+
+Average Turnaround Time = 13 / 3 = 4.333333333333333.
+
+Average Waiting Time = 4 / 3 = 1.3333333333333333.
+
+Average Response Time = 4 / 3 = 1.3333333333333333.
+
+Gantt timeline parts and times:
+
+Start with time = 0.
+
+For P0: time (0) < arrival (0)? No → parts append P0, times append 0, then time becomes P0 completion 4.
+
+For P1: time (4) < arrival (2)? No → parts append P1, times append 4, then time becomes P1 completion 7.
+
+For P2: time (7) < arrival (5)? No → append P2, times append 7, time becomes 9.
+
+After loop append final time 9.
+
+So parts = ["P0", "P1", "P2"] and times = [0,4,7,9].
+
+Printed Gantt:
+
+P0 | P1 | P2
+0  4  7  9
+
+
+All numbers match the earlier computed metrics.

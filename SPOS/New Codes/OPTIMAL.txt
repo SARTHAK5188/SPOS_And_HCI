@@ -1,0 +1,219 @@
+Line-by-line explanation (every important line)
+Function start and variables
+def run_optimal(pages, frames_count):
+    frames = []
+    faults = 0
+
+
+pages is a list of integers (the reference string), e.g. [7,0,1,2,0,3,0,4,2].
+
+frames is the list of pages currently loaded in memory frames (initially empty).
+
+faults counts page faults.
+
+Main loop
+for i, page in enumerate(pages):
+
+
+Loop over each reference; i is the index (0-based), page is the page number referenced at time i.
+
+Hit case
+    if page in frames:
+        print(f"Ref {page:>2} -> Frames: {frames} (hit)")
+        continue
+
+
+If the page is already in frames it’s a hit: nothing changes. The code prints the frames and moves on.
+
+Page fault when free frame available
+    faults += 1
+    if len(frames) < frames_count:
+        frames.append(page)
+        print(f"Ref {page:>2} -> Frames: {frames} (fault, loaded)")
+        continue
+
+
+A page fault occurred (faults increments).
+
+If there is room in frames (frames not full), simply append the page and print that it was loaded.
+
+Page replacement decision (core of Optimal)
+    next_uses = []
+    future = pages[i+1:]
+    for f in frames:
+        if f in future:
+            next_uses.append(future.index(f))
+        else:
+            next_uses.append(float('inf'))
+
+
+Build future = list of remaining references after current index (slice).
+
+For each page f currently in frames:
+
+If f appears in future, future.index(f) returns the index (distance from now) of that first future occurrence. Lower index → used sooner.
+
+If f is not in future, then it is never used again; treat its next use as infinity (ideal candidate to replace).
+
+next_uses stores the "distance to next use" for each frame entry (index-aligned with frames).
+
+Important note: future.index(f) returns the index within future, starting at 0 for the immediate next reference. That distance ordering is sufficient to pick the farthest next use.
+
+Replacement and print
+    replace_idx = next_uses.index(max(next_uses))
+    replaced = frames[replace_idx]
+    frames[replace_idx] = page
+    print(f"Ref {page:>2} -> Frames: {frames} (fault, replaced P{replaced})")
+
+
+Find the frame whose next use distance is largest (max of next_uses). replace_idx is the position to evict.
+
+Replace the page at that frame with the new page and print what was replaced.
+
+Final printing/return:
+
+print(f"\nTotal page faults (Optimal): {faults}\n")
+return faults
+
+
+Print total faults and return the number.
+
+Complexity & implementation notes (explicit)
+
+Worst-case time complexity O(N * F * R) where:
+
+N = number of references,
+
+F = number of frames,
+
+R = length of future slice (O(N) worst-case), because for each frame you search in future. So naive code is O(N * F * N) = O(N² * F) in worst-case.
+
+The implementation is fine for small inputs used in teaching/demo. For large traces, optimize by using precomputed next-occurrence indices (e.g., build a map of future positions or scan from the end to compute next-use arrays in O(N)).
+
+Exact numeric example — every step, digit-by-digit arithmetic
+
+Let’s run the standard textbook reference string to be safe:
+
+pages = [7,0,1,2,0,3,0,4,2]
+frames_count = 3
+
+
+We'll trace every iteration.
+
+Initial:
+
+frames = [], faults = 0.
+
+i=0, page=7
+
+7 in frames? No.
+
+faults = 0 + 1 = 1.
+
+len(frames) < 3 → 0 < 3 True → append 7 → frames = [7].
+
+Print: Ref 7 -> Frames: [7] (fault, loaded)
+
+i=1, page=0
+
+0 in [7]? No.
+
+faults = 1 + 1 = 2.
+
+len(frames) = 1 < 3 → append 0 → frames = [7,0].
+
+Print: Ref 0 -> Frames: [7, 0] (fault, loaded)
+
+i=2, page=1
+
+1 in [7,0]? No.
+
+faults = 2 + 1 = 3.
+
+len(frames) = 2 < 3 → append 1 → frames = [7,0,1].
+
+Print: Ref 1 -> Frames: [7, 0, 1] (fault, loaded)
+
+i=3, page=2
+
+2 in [7,0,1]? No.
+
+faults = 3 + 1 = 4.
+
+frames full (3 == 3), must replace.
+
+future = pages[4:] = [0,3,0,4,2].
+
+For frames:
+
+f=7: 7 in future? → No → next_use = inf.
+
+f=0: 0 in future? → Yes → future.index(0) = 0 (the first element of future is 0).
+
+f=1: 1 in future? → No → next_use = inf.
+
+next_uses = [inf, 0, inf]. max(next_uses) = inf; index(max) returns first occurrence of inf, which is index 0 (the 7). (When two pages are never used again, code picks the first one encountered.)
+
+replace_idx = 0. Replace frames[0] (7) with 2 → frames = [2,0,1].
+
+Print: Ref 2 -> Frames: [2, 0, 1] (fault, replaced P7)
+
+i=4, page=0
+
+0 in [2,0,1]? Yes → Hit.
+
+Print: Ref 0 -> Frames: [2, 0, 1] (hit)
+
+i=5, page=3
+
+3 in frames? No.
+
+faults = 4 + 1 = 5.
+
+future = pages[6:] = [0,4,2].
+
+next_uses:
+
+f=2: 2 in future? → Yes → future.index(2) = 2.
+
+f=0: 0 in future? → Yes → future.index(0) = 0.
+
+f=1: 1 in future? → No → inf.
+
+next_uses = [2,0,inf]. max is inf at index 2 → replace frame 2 (page 1).
+
+frames => [2,0,3].
+
+Print: Ref 3 -> Frames: [2, 0, 3] (fault, replaced P1)
+
+i=6, page=0
+
+0 in [2,0,3]? Yes → Hit. Print hit.
+
+i=7, page=4
+
+4 in frames? No.
+
+faults = 5 + 1 = 6.
+
+future = pages[8:] = [2].
+
+next_uses:
+
+f=2: 2 in future → yes → future.index(2)=0.
+
+f=0: not in future → inf.
+
+f=3: not in future → inf.
+
+next_uses = [0, inf, inf]. max is inf; first inf occurs at index 1 → replace frames[1] (page 0).
+
+frames => [2,4,3].
+
+Print: Ref 4 -> Frames: [2, 4, 3] (fault, replaced P0)
+
+i=8, page=2
+
+2 in [2,4,3]? Yes → Hit.
+
+End: faults = 6. Program prints total 6, which is optimal for this trace with 3 frames

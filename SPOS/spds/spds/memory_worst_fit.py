@@ -1,0 +1,89 @@
+"""
+Worst Fit Memory Placement (menu driven, corrected)
+
+This program implements the Worst Fit placement:
+- For each process, choose the largest free block that can hold it.
+- Update that block's free size after allocation.
+- Prints allocation and the remaining fragment of the block immediately after allocation.
+"""
+
+def get_input():
+    try:
+        blocks = list(map(int, input("Enter memory block sizes (space-separated): ").strip().split()))
+        procs = list(map(int, input("Enter process sizes (space-separated): ").strip().split()))
+        if not blocks or not procs:
+            print("Blocks and processes must be non-empty.")
+            return None, None
+        if any(b <= 0 for b in blocks) or any(p <= 0 for p in procs):
+            print("Sizes must be positive integers.")
+            return None, None
+        return blocks, procs
+    except ValueError:
+        print("Invalid input. Use integers separated by spaces.")
+        return None, None
+
+
+def worst_fit(blocks, processes):
+    memory = blocks[:]               # copy of block free sizes
+    allocation = [-1] * len(processes)
+    remaining_after_alloc = [None] * len(processes)
+    block_size_before = [None] * len(processes)       # ✅ store size before allocation
+
+    for i, psize in enumerate(processes):
+        # find index of largest block that can fit the process
+        worst_idx = -1
+        worst_size = -1
+        for j, free in enumerate(memory):
+            if free >= psize and free > worst_size:
+                worst_size = free
+                worst_idx = j
+        if worst_idx != -1:
+            block_size_before[i] = memory[worst_idx]  # ✅ capture size before reducing
+            memory[worst_idx] -= psize
+            allocation[i] = worst_idx
+            remaining_after_alloc[i] = memory[worst_idx]
+        else:
+            allocation[i] = -1
+            remaining_after_alloc[i] = None
+            block_size_before[i] = None
+
+    return allocation, remaining_after_alloc, memory, block_size_before  # ✅ return extra info
+
+
+def print_allocation(processes, allocation, remaining_after_alloc, final_memory, block_size_before):
+    print("\nAllocation Results")
+    print("Process | Size | Block Allocated | Block Size | Remaining Fragment")
+    print("---------------------------------------------------------------")
+    for i, p in enumerate(processes):
+        blk = allocation[i]
+        if blk != -1:
+            print(f"P{i+1:<6} | {p:<4} | {blk+1:^15} | {block_size_before[i]:^10} | {remaining_after_alloc[i]:^18}")
+        else:
+            print(f"P{i+1:<6} | {p:<4} | {'Not Allocated':^15} | {'-':^10} | {'-':^18}")
+    print("\nFinal free sizes of blocks:", final_memory)
+    print()
+
+
+def main_menu():
+    while True:
+        print("\n=== Worst Fit Memory Placement ===")
+        print("1. Run Worst Fit")
+        print("2. Exit")
+        choice = input("Enter choice (1 or 2): ").strip()
+        if choice == "1":
+            blocks, procs = get_input()
+            if blocks is None:
+                continue
+            allocation, remaining_after_alloc, final_memory, block_size_before = worst_fit(blocks, procs)
+            print("\nInitial memory blocks:", blocks)
+            print("Processes:", procs)
+            print_allocation(procs, allocation, remaining_after_alloc, final_memory, block_size_before)
+        elif choice == "2":
+            print("Goodbye!")
+            break
+        else:
+            print("Invalid choice. Enter 1 or 2.")
+
+
+if __name__ == "__main__":
+    main_menu()

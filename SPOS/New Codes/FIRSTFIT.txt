@@ -1,0 +1,193 @@
+Line-by-line explanation (every line, plain language)
+accept()
+def accept():
+    global no_of_blocks, no_of_processes, blocks, processes
+
+
+Defines function accept. The global line tells Python the listed names refer to top-level variables, not local ones. That means values set here will be visible to other functions.
+
+    no_of_blocks = int(input("Enter no. of blocks : "))
+
+
+Prompt the user for a number (text), convert to integer, store as no_of_blocks. If the user types non-numeric text, Python will raise an error (the program doesn't catch it here).
+
+    blocks = [int(input(f"Enter block size for b{i+1} : ")) for i in range(no_of_blocks)]
+
+
+A list comprehension that repeats no_of_blocks times. For each i it prompts Enter block size for b1, b2, ..., converts each input to int and collects into the list blocks. Example result: [100, 500, 200].
+
+    print()
+
+
+Prints a blank line for spacing.
+
+    no_of_processes = int(input("Enter no. of Processes or Files : "))
+    processes = [int(input(f"Enter Process or File size for P{i+1} : ")) for i in range(no_of_processes)]
+
+
+Same pattern: read how many processes, then read that many process sizes into list processes.
+
+Bottom line: after calling accept() there will be four global variables:
+
+no_of_blocks (int)
+
+blocks (list of ints)
+
+no_of_processes (int)
+
+processes (list of ints)
+
+first_fit()
+def first_fit():
+    print("\n----- FIRST FIT -----")
+    print("File No.\tFile Size\tBlock No.\tBlock Size\tFragment")
+
+
+Prints a header for the allocation result table.
+
+    temp_blocks = list(blocks)
+
+
+Makes a copy of blocks named temp_blocks. This represents the remaining free space in each block during allocation. Using a copy prevents changing the original blocks list the user entered.
+
+    for i in range(no_of_processes):
+        allocated = False
+        for j in range(no_of_blocks):
+            if processes[i] <= temp_blocks[j]:
+                fragment = temp_blocks[j] - processes[i]
+                print(f"{i+1}\t\t{processes[i]}\t\t{j+1}\t\t{temp_blocks[j]}\t\t{fragment}")
+                temp_blocks[j] -= processes[i]  # reduce block by allocated size (splittable)
+                allocated = True
+                break
+        if not allocated:
+            print(f"{i+1}\t\t{processes[i]}\t\tNot Allocated")
+    print("-" * 50)
+
+
+Outer loop: for each process index i (0..no_of_processes-1):
+
+allocated = False — flag to track whether this process was placed.
+
+Inner loop: iterate j over all blocks (0..no_of_blocks-1).
+
+if processes[i] <= temp_blocks[j]: — if the process fits in block j (using remaining space).
+
+If it fits:
+
+fragment = temp_blocks[j] - processes[i] — leftover space after allocation.
+
+Print a row: process number (1-based), process size, block number (1-based), block size before allocation (temp_blocks[j]), and fragment.
+
+temp_blocks[j] -= processes[i] — subtract the process size from that block's remaining free space (this models splittable blocks).
+
+allocated = True and break — stop searching blocks for this process because First Fit uses the first block that fits.
+
+After inner loop: if allocated is still False, print that process i+1 was Not Allocated.
+
+After finishing all processes, print a dashed separator.
+
+Important note: The printed "Block Size" column shows the remaining free space in that block before allocation, because it prints temp_blocks[j] then subtracts. That can confuse readers expecting the original block size; if you want the original size, print blocks[j].
+
+menu() and main guard
+
+Menu prints options, reads user choice with input().strip(). The prompt incorrectly says (1-7) even though only 1–3 are valid (minor bug). If user chooses 2 before entering input, the first_fit() call would throw NameError because the global variables don't exist; the code catches that and asks to enter input first.
+
+if __name__ == "__main__": menu() runs the interactive menu when the file is executed directly.
+
+What the First Fit algorithm does (concept)
+
+For each process in order, the algorithm scans blocks from the first to the last and places the process into the first block that has enough remaining space.
+
+After placement, this implementation reduces that block's remaining space by the process size — i.e., blocks are splittable and can accept multiple processes over time until full.
+
+First Fit is greedy and fast (it stops at the first fitting block). Complexity is O(P * B) for P processes and B blocks.
+
+Exact worked example — every arithmetic step shown
+
+We'll run a small example and trace every variable and printed output digit-by-digit. Suppose user input:
+
+Number of blocks: 4
+
+Block sizes: 100, 500, 200, 300
+
+Number of processes: 4
+
+Process sizes: 212, 417, 112, 426
+
+So:
+
+no_of_blocks = 4
+
+blocks = [100, 500, 200, 300]
+
+no_of_processes = 4
+
+processes = [212, 417, 112, 426]
+
+Start first_fit():
+
+temp_blocks = list(blocks) → copy: [100, 500, 200, 300].
+
+Process 1: i=0, processes[0] = 212.
+
+allocated = False.
+
+Check block j=0: temp_blocks[0] = 100. Test 212 <= 100 → False.
+
+j=1: temp_blocks[1] = 500. Test 212 <= 500 → True.
+
+fragment = 500 - 212 → 500 − 200 = 300, then 300 − 12 = 288. So fragment = 288. (Digit-by-digit: 500 − 212 = 288.)
+
+Print row: 1\t\t212\t\t2\t\t500\t\t288 (shows block size 500 before allocation).
+
+temp_blocks[1] -= 212 → temp_blocks[1] becomes 500 - 212 = 288. So temp_blocks now [100, 288, 200, 300].
+
+allocated = True, break inner loop.
+
+Not printing "Not Allocated" since allocated True.
+
+Process 2: i=1, processes[1] = 417.
+
+allocated = False.
+
+j=0: 417 <= 100? No.
+
+j=1: temp_blocks[1] = 288. 417 <= 288? No.
+
+j=2: temp_blocks[2] = 200. 417 <= 200? No.
+
+j=3: temp_blocks[3] = 300. 417 <= 300? No.
+
+End inner loop: allocated still False → print 2\t\t417\t\tNot Allocated.
+
+Process 3: i=2, processes[2] = 112.
+
+allocated = False.
+
+j=0: 112 <= 100? No.
+
+j=1: 112 <= 288? Yes.
+
+fragment = 288 - 112 = 176.
+
+Print row: 3\t\t112\t\t2\t\t288\t\t176.
+
+temp_blocks[1] -= 112 → 288 - 112 = 176.
+
+temp_blocks becomes [100, 176, 200, 300].
+
+allocated = True, break.
+
+Process 4: i=3, processes[3] = 426.
+
+j=0: 426 <= 100? No.
+
+j=1: 426 <= 176? No.
+
+j=2: 426 <= 200? No.
+
+j=3: 426 <= 300? No.
+
+Not allocated → print 4\t\t426\t\tNot Allocated.
+
+Final printed table and trailing dashed line are produced. No changes to blocks original list.

@@ -1,0 +1,260 @@
+1) Function accept() — reads user inputs and stores them
+def accept():
+    global no_of_blocks, no_of_processes, blocks, processes
+    no_of_blocks = int(input("Enter no. of blocks : "))
+    blocks = [int(input(f"Enter block size for b{i+1} : ")) for i in range(no_of_blocks)]
+    print()
+    
+    no_of_processes = int(input("Enter no. of Processes or Files : "))
+    processes = [int(input(f"Enter Process or File size for P{i+1} : ")) for i in range(no_of_processes)]
+
+
+Explain slowly:
+
+def accept(): — defines a function named accept. Nothing runs until you call accept() elsewhere.
+
+global no_of_blocks, no_of_processes, blocks, processes — global tells Python: “these names refer to variables stored at the top level (outside any function).” That means the values we set inside accept() will be visible elsewhere in the program. Using global variables like this is allowed but often bad practice because it makes the program harder to reason about. (We’ll remove them later.)
+
+no_of_blocks = int(input("Enter no. of blocks : ")):
+
+input(...) prints the message and waits for you to type something and press Enter. The result is always text (a string).
+
+int(...) converts that text to a number. If you type 5 it becomes the integer 5.
+
+no_of_blocks will hold the number of memory blocks.
+
+blocks = [int(input(f"Enter block size for b{i+1} : ")) for i in range(no_of_blocks)]:
+
+This is a list comprehension. It repeats the input step no_of_blocks times.
+
+range(no_of_blocks) generates numbers 0..no_of_blocks-1; for each i, it prompts: Enter block size for b1, b2, etc.
+
+Each input is converted to an integer and put into the list blocks. Example: if you enter 100, 200, 300, then blocks = [100, 200, 300].
+
+print() — prints a blank line, for tidy formatting.
+
+no_of_processes = int(input("Enter no. of Processes or Files : ")) — same idea: asks how many processes/files you want to allocate.
+
+processes = [int(input(f"Enter Process or File size for P{i+1} : ")) for i in range(no_of_processes)] — gets the sizes of all processes and stores them as integers in the list processes.
+
+Bottom line: accept() collects four variables:
+
+no_of_blocks (integer)
+
+blocks (list of integers — the sizes of memory blocks)
+
+no_of_processes (integer)
+
+processes (list of integers — sizes of processes/files to allocate)
+
+2) Function best_fit() — does the Best Fit allocation and prints a table
+def best_fit():
+    print("\n----- BEST FIT -----")
+    print("File No.\tFile Size\tBlock No.\tBlock Size\tFragment")
+    temp_blocks = list(blocks)
+    for i in range(no_of_processes):
+        best_block_index = -1
+        for j in range(no_of_blocks):
+            if processes[i] <= temp_blocks[j]:
+                if best_block_index == -1 or temp_blocks[j] < temp_blocks[best_block_index]:
+                    best_block_index = j
+        if best_block_index != -1:
+            fragment = temp_blocks[best_block_index] - processes[i]
+            print(f"{i+1}\t\t{processes[i]}\t\t{best_block_index+1}\t\t{temp_blocks[best_block_index]}\t\t{fragment}")
+            temp_blocks[best_block_index] -= processes[i] # reduce block by allocated size
+        else:
+            print(f"{i+1}\t\t{processes[i]}\t\tNot Allocated")
+    print("-" * 50)
+
+
+Step-by-step plain-language:
+
+Prints a header for the Best Fit output table.
+
+temp_blocks = list(blocks) — very important: this makes a copy of blocks. Why? Because best_fit() will simulate allocating processes and reducing free space — we want to change temp_blocks without changing the original blocks list.
+
+for i in range(no_of_processes): — for each process (index i from 0 up to no_of_processes-1):
+
+best_block_index = -1 — start with “no block chosen yet”. Using -1 as a sentinel value.
+
+for j in range(no_of_blocks): — loop over every block (index j).
+
+if processes[i] <= temp_blocks[j]: — check if process i can fit into block j (the free space in that block is at least the process size).
+
+if best_block_index == -1 or temp_blocks[j] < temp_blocks[best_block_index]: — if we have not chosen any block yet, or this candidate block j has less free space than the previously chosen best block, then choose j as the best. This is the Best Fit rule: pick the smallest block that still fits the process.
+
+After checking all blocks:
+
+If best_block_index != -1, a block was found:
+
+fragment = temp_blocks[best_block_index] - processes[i] — leftover space (fragmentation) after placing the process.
+
+print(f"...") prints the allocation: file number, file size, block number (1-based), block size (the current free size before allocating), and fragment.
+
+temp_blocks[best_block_index] -= processes[i] — reduce that block’s free space by the allocated amount (we simulate that the process now occupies that portion).
+
+Else (no block could fit the process) — print “Not Allocated”.
+
+print("-" * 50) — prints a dashed line (50 dashes) at the end.
+
+Important note about the printed "Block Size":
+
+The script prints temp_blocks[best_block_index] in the table before subtracting the process. So the “Block Size” printed is the remaining free space in that block at the time of allocation, not the original block size. That may confuse readers who expect to see original block sizes.
+
+3) menu() — text menu to run the program
+def menu():
+    """
+    Simple menu-driven interface. You can:
+      1 - Enter input (calls accept)
+      2 - Run Best Fit
+      3 - Exit
+    """
+    while True:
+        print("\nMenu:")
+        print("1. Enter blocks and processes (accept)")
+        print("2. Best Fit")
+        print("3. Exit")
+        choice = input("Enter your choice (1-7): ").strip()
+
+        if choice == "1":
+            accept()
+        elif choice == "2":
+            try:
+                best_fit()
+            except NameError:
+                print("Error: Please enter blocks and processes first (choose option 1).")
+        elif choice == "3":
+            print("Exiting.")
+            break
+        else:
+            print("Invalid choice. Enter a number between 1 and 7.")
+
+
+Explain plainly:
+
+while True: — infinite loop. The menu keeps showing until we break out (option 3).
+
+It prints three menu choices.
+
+choice = input("Enter your choice (1-7): ").strip() — reads user’s choice, .strip() removes extra spaces.
+
+NOTE: the prompt says (1-7) but there are only options 1–3. That’s a bug / copy-paste error. It should say (1-3).
+
+Then checks choice:
+
+If "1", call accept() to read input from the user.
+
+If "2", run best_fit(). The try/except NameError catches the case where the global variables (blocks, etc.) don’t exist because the user skipped choice 1. If so it prints a helpful error.
+
+If "3", print "Exiting." and break — this ends the loop and the program finishes.
+
+Else, it prints “Invalid choice...”.
+
+4) The program entry point
+if __name__ == "__main__":
+    menu()
+
+
+This is Python’s standard: “if this file is run directly (not imported), call menu() and start the program.” If you import this file into another Python script, menu() won’t automatically run.
+
+What the Best Fit algorithm actually does (simple concept)
+
+You have several memory blocks (each has a size).
+
+You have several processes/files (each needs some space).
+
+For each process (in order), Best Fit finds the smallest block that is still big enough for the process and places it there. That minimizes the leftover space in the chosen block.
+
+After placing a process, the block’s free space decreases by that process size.
+
+This is a greedy algorithm processed in the order of the given processes. It does not reorder processes to find a globally optimal allocation.
+
+Example: run the algorithm with real numbers (trace the variables)
+
+Suppose user enters:
+
+Number of blocks: 5
+
+Blocks sizes: 100, 500, 200, 300, 600
+
+Number of processes: 4
+
+Process sizes: 212, 417, 112, 426
+
+Let's step through:
+
+Initial state:
+
+blocks = [100, 500, 200, 300, 600]
+
+temp_blocks = [100, 500, 200, 300, 600] (copy)
+
+processes = [212, 417, 112, 426]
+
+Process 1 (size 212):
+
+Check blocks:
+
+b1=100 → 212 > 100 → can't fit.
+
+b2=500 → fits (candidate). best so far = index 1 (size 500).
+
+b3=200 → 212 > 200 → can't fit.
+
+b4=300 → fits, and 300 < 500 → better; best becomes index 3 (size 300).
+
+b5=600 → fits but 600 > 300 → no change.
+
+Choose block 4 (index 3, printed as block 4).
+
+Fragment = 300 − 212 = 88.
+
+After allocation: temp_blocks becomes [100, 500, 200, 88, 600].
+
+Process 2 (size 417):
+
+Check blocks:
+
+b1=100 → no
+
+b2=500 → fits -> best = index 1 (size 500)
+
+b3=200 → no
+
+b4=88 → no
+
+b5=600 → fits but 600 > 500 -> no change
+
+Choose block 2 (index 1). Fragment = 500 − 417 = 83.
+
+temp_blocks becomes [100, 83, 200, 88, 600].
+
+Process 3 (size 112):
+
+Check blocks:
+
+b1=100 → no
+
+b2=83 → no
+
+b3=200 → fits -> best = index 2 (size 200)
+
+b4=88 → no
+
+b5=600 → fits but 600 > 200 -> no
+
+Choose block 3 (index 2). Fragment = 200 − 112 = 88.
+
+temp_blocks becomes [100, 83, 88, 88, 600].
+
+Process 4 (size 426):
+
+Check:
+
+only b5=600 can fit (others are too small).
+
+Choose block 5 (index 4). Fragment = 600 − 426 = 174.
+
+temp_blocks becomes [100, 83, 88, 88, 174].
+
+If any process had no fitting block, it would be printed as Not Allocated.

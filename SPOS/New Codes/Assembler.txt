@@ -1,0 +1,413 @@
+High-level summary (one sentence)
+
+This is a two-pass assembler simulator implemented in Python: Pass-I builds a symbol table and an intermediate listing with addresses, and Pass-II converts that intermediate listing into decimal machine code using the symbol table.
+
+File top — data and containers
+OPTAB = {
+    "LOAD": "01",
+    "STORE": "02",
+    "ADD": "03",
+    "SUB": "04",
+    "JMP": "05"
+}
+
+
+OPTAB is a dictionary mapping mnemonic strings (assembly instruction names) to their opcode representation. Here the opcode values are stored as hex strings (e.g., "03").
+
+Purpose: during Pass-II we look up OPTAB[opcode] to find the machine opcode.
+
+DIRECTIVES = ["START", "END", "WORD", "RESW", "RESB"]
+
+
+DIRECTIVES is a list of assembler directives — they instruct the assembler, not the CPU.
+
+SYMTAB = {}
+intermediate_code = []
+
+
+SYMTAB (symbol table): a dictionary where keys are label names and values are integer addresses. Initially empty. Pass-I fills this.
+
+intermediate_code: a list to store tuples (locctr, label, opcode, operand) in the order the source lines are processed.
+
+parse_line(line)
+def parse_line(line):
+    parts = line.split()
+    label = parts[0] if len(parts) == 3 else None
+    opcode = parts[1] if len(parts) == 3 else parts[0]
+    operand = parts[2] if len(parts) == 3 else parts[1] if len(parts) == 2 else None
+    return label, opcode, operand
+
+
+What it does
+
+Splits the input string line on whitespace into tokens: parts.
+
+Assumes the line is one of:
+
+LABEL OPCODE OPERAND (3 tokens)
+
+OPCODE OPERAND (2 tokens)
+
+OPCODE (1 token)
+
+Returns a 3-tuple: (label, opcode, operand) where any missing piece becomes None.
+
+Important limitations
+
+It does not handle comments or empty lines.
+
+It only supports exactly the token patterns above. Extra spaces or additional tokens break assumptions.
+
+It treats tokens case-sensitively in places — the rest of the code expects opcodes and directives exactly as uppercase strings in the tables.
+
+pass1(input_lines)
+def pass1(input_lines):
+    locctr = 0
+    start_address = 0
+    for line in input_lines:
+        label, opcode, operand = parse_line(line.strip())
+
+
+pass1 takes input_lines, a list of strings, each string an assembly source line.
+
+locctr (location counter) tracks the current memory address. Initially 0. It changes as we process instructions and data.
+
+start_address will store the value from the START directive (if any).
+
+The loop processes each line. line.strip() removes leading/trailing whitespace before parsing.
+
+START handling
+        if opcode == "START":
+            start_address = int(operand)
+            locctr = start_address
+            intermediate_code.append((locctr, label, opcode, operand))
+            continue
+
+
+If opcode is START, operand should be a number (string), so int(operand) converts it to integer (decimal). Example: "1000" → 1000.
+
+Sets locctr = start_address to begin addresses from this value.
+
+Appends record (locctr, label, opcode, operand) to intermediate_code.
+
+continue moves to the next iteration — START line processing ends here.
+
+Label handling
+        if label:
+            if label in SYMTAB:
+                print(f"Error: Duplicate symbol {label}")
+            SYMTAB[label] = locctr
+
+
+If a label exists on this line (i.e., label not None), we:
+
+Check for duplicates: if already in SYMTAB, print an error message (but the program continues).
+
+Store SYMTAB[label] = locctr — meaning the label’s address is the current locctr.
+
+Instruction handling (opcodes)
+        if opcode in OPTAB:
+            intermediate_code.append((locctr, label, opcode, operand))
+            locctr += 3 # Assume all instructions are 3 bytes
+
+
+If opcode is a key in OPTAB (a real instruction), append the tuple to intermediate_code.
+
+Increase locctr by 3 because this pseudo-machine assumes fixed instruction length = 3 bytes.
+
+Directives handling
+        elif opcode in DIRECTIVES:
+            if opcode == "WORD":
+                intermediate_code.append((locctr, label, opcode, operand))
+                locctr += 3
+            elif opcode == "RESW":
+                intermediate_code.append((locctr, label, opcode, operand))
+                locctr += 3 * int(operand)
+            elif opcode == "RESB":
+                intermediate_code.append((locctr, label, opcode, operand))
+                locctr += int(operand)
+            elif opcode == "END":
+                intermediate_code.append((locctr, label, opcode, operand))
+                break
+
+
+WORD: stores a single word (3 bytes), so locctr += 3.
+
+RESW n: reserve n words -> 3 * n bytes reserved; int(operand) must be integer n.
+
+RESB n: reserve n bytes -> locctr += n.
+
+END: append record then break out of loop (stop Pass-I).
+
+Invalid opcodes
+        else:
+            print(f"Error: Invalid opcode {opcode}")
+
+
+If opcode not in OPTAB or DIRECTIVES, prints an error.
+
+Return
+    return start_address, intermediate_code
+
+
+Returns start_address and the intermediate_code list (though the code also uses the global intermediate_code variable).
+
+pass2(start_address, intermediate_code)
+def pass2(start_address, intermediate_code):
+    final_code = []
+    for locctr, label, opcode, operand in intermediate_code:
+
+
+pass2 takes start_address and the intermediate_code list produced by Pass-I.
+
+final_code will collect formatted machine-code text lines.
+
+Instruction translation
+        if opcode in OPTAB:
+            machine_code = int(OPTAB[opcode], 16)  # Convert hex opcode to decimal
+            if operand in SYMTAB:
+                address = SYMTAB[operand]           # Use decimal address directly
+            else:
+                address = 0
+            final_code.append(f"{locctr:04d} {machine_code:02d} {address:04d}")
+
+
+For instructions:
+
+OPTAB[opcode] is a hex string like "03". int(..., 16) converts from base 16 to integer 3.
+
+Look up the operand symbol in SYMTAB for its address. If not found, address = 0 (no error thrown; this is a weak point).
+
+Append a formatted string to final_code.
+
+{locctr:04d} prints locctr as a decimal with minimum width 4 (padded with spaces/zeros depending on formatting).
+
+{machine_code:02d} prints opcode decimal with width 2.
+
+{address:04d} prints address decimal with width 4.
+
+Example: if locctr=1000, opcode='LOAD' → machine_code=1, operand='ALPHA' → address=1009 → appended "1000 01 1009" (numbers shown in decimal; formatting may show leading zeros/spaces).
+
+WORD directive output
+        elif opcode == "WORD":
+            final_code.append(f"{locctr:04d} {int(operand):06d}")
+
+
+For WORD n, append locctr then the integer value n printed with width 6 decimal (:06d).
+
+RESW / RESB output
+        elif opcode == "RESW" or opcode == "RESB":
+            final_code.append(f"{locctr:04d} ----")
+
+
+For reserves, there’s no machine code emitted — writes ---- as placeholder.
+
+END
+        elif opcode == "END":
+            final_code.append(f"{locctr:04d} END")
+    return final_code
+
+
+For END, writes a marker and then function returns the final_code list.
+
+main() — driving the program
+def main():
+    input_lines = [
+        "COPY START 1000",
+        "FIRST LOAD ALPHA",
+        " ADD BETA",
+        ...
+    ]
+
+
+The input_lines list is the source assembly program embedded directly in the file. Each line matches the parse_line assumptions.
+
+    start_address, intermediate_code = pass1(input_lines)
+
+
+Call Pass-I: it fills global SYMTAB and intermediate_code and returns start_address.
+
+    print("\nPass-I Output:")
+    print("Symbol Table (SYMTAB):", SYMTAB)
+    print("\nIntermediate Code:")
+    for entry in intermediate_code:
+        print(entry)
+
+
+Prints the symbol table and intermediate code tuples.
+
+    final_code = pass2(start_address, intermediate_code)
+    print("\nPass-II Output (Final Machine Code - DECIMAL):")
+    for code in final_code:
+        print(code)
+
+
+Runs Pass-II and prints each line of the decimal machine code.
+
+if __name__ == "__main__":
+    main()
+
+
+This ensures main() runs when you execute the file directly (e.g., python passfile.py). If the file is imported as a module, main() won’t run automatically.
+
+Step-by-step trace with concrete values (walkthrough)
+
+Use the given input lines — I’ll show each Pass-I step and locctr updates.
+
+Initial:
+
+locctr = 0, SYMTAB = {}, intermediate_code = []
+
+Line: "COPY START 1000"
+
+parse_line → ("COPY", "START", "1000")
+
+START → start_address = 1000, locctr = 1000
+
+append (1000, 'COPY', 'START', '1000')
+
+Line: "FIRST LOAD ALPHA"
+
+parse_line → ("FIRST", "LOAD", "ALPHA")
+
+label FIRST → SYMTAB['FIRST'] = 1000
+
+opcode LOAD in OPTAB → append (1000, 'FIRST', 'LOAD', 'ALPHA')
+
+locctr += 3 → locctr = 1003
+
+Line: " ADD BETA"
+
+parse_line → (None, 'ADD', 'BETA') — because length=2, label None
+
+opcode ADD → append (1003, None, 'ADD', 'BETA')
+
+locctr = 1006
+
+Line: " STORE GAMMA"
+
+append (1006, None, 'STORE', 'GAMMA')
+
+locctr = 1009
+
+Line: "ALPHA WORD 5"
+
+label 'ALPHA' → SYMTAB['ALPHA'] = 1009
+
+append (1009, 'ALPHA', 'WORD', '5')
+
+locctr += 3 → locctr = 1012
+
+Line: "BETA WORD 10"
+
+SYMTAB['BETA'] = 1012; append (1012, 'BETA', 'WORD', '10'); locctr = 1015
+
+Line: "GAMMA RESW 1"
+
+SYMTAB['GAMMA'] = 1015; append (1015, 'GAMMA', 'RESW', '1')
+
+locctr += 3 * 1 → locctr = 1018
+
+Line: " END FIRST"
+
+append (1018, None, 'END', 'FIRST') and break out of loop.
+
+Pass-I outputs
+
+SYMTAB = {'FIRST': 1000, 'ALPHA': 1009, 'BETA': 1012, 'GAMMA': 1015}
+
+intermediate_code list as shown above.
+
+Pass-II conversion
+
+Walk each intermediate tuple and generate lines:
+
+(1000, 'COPY', 'START', '1000') → START: no code (will still be in intermediate; pass2 logic: START not in branches; since START not in OPTAB nor other branches, in this implementation it's neither matched: actually pass2 only checks OPTAB, WORD, RESW/RESB, END; START won't match any branch — but in our code sample we didn't handle START in pass2; however our earlier versions included START as first intermediate but pass2's if-elif chain will treat START as none of those and nothing appended — check: in provided code pass2 doesn't handle START, so the START record will be ignored. This is a nuance: good to mention.)
+
+(1000, 'FIRST', 'LOAD', 'ALPHA') → OPTAB['LOAD']='01' → int('01',16)=1 → address=SYMTAB['ALPHA']=1009 → final line: "1000 01 1009" (formatted decimal)
+
+(1003, None, 'ADD', 'BETA') → 03 → 3, address 1012 → "1003 03 1012"
+
+(1006, None, 'STORE', 'GAMMA') → "1006 02 1015"
+
+(1009, 'ALPHA', 'WORD', '5') → "1009 000005" (because :06d)
+
+(1012, 'BETA', 'WORD', '10') → "1012 000010"
+
+(1015, 'GAMMA', 'RESW', '1') → "1015 ----"
+
+(1018, None, 'END', 'FIRST') → "1018 END"
+
+Important details, gotchas & exam talking points
+
+Why two passes?
+
+Labels may be used before they are defined (forward reference). Pass-I finds all labels and addresses; Pass-II resolves addresses.
+
+Data structures used
+
+OPTAB — dictionary (mnemonic → opcode string).
+
+SYMTAB — dictionary (symbol → int address).
+
+intermediate_code — list of tuples (loc, label, opcode, operand).
+
+Address arithmetic
+
+locctr increments by instruction length (3) or data size.
+
+RESW n reserves 3*n bytes. RESB n reserves n bytes.
+
+Formatting
+
+f"{locctr:04d}" prints decimal width 4.
+
+int(OPTAB[opcode], 16) converts hex-string opcode to decimal integer.
+
+Edge cases / Weaknesses (be honest in viva)
+
+parse_line is fragile: does not accept comments, blank lines, extra spaces, tabs, multi-word operands, or varying token counts beyond the 1/2/3 token assumption.
+
+pass2 does not explicitly handle START — its intermediate START record will be ignored by pass2 (no output for START). Depending on assignment, you might want to handle START explicitly.
+
+Undefined symbols: if operand not found in SYMTAB, code uses address = 0 silently. Better behaviour: report an error or leave unresolved.
+
+Duplicate symbols: detected but only printed; program continues — better to flag as an error and stop or collect errors and report.
+
+Number parsing: int(operand) assumes decimal input for START and RESW/RESB. If the assignment expects hex (like 1000H) you must handle that.
+
+What to memorize for practical
+
+What SYM TAB is and how it’s built.
+
+How locctr changes for instructions (+3) and directives (WORD, RESW, RESB).
+
+HOW pass-2 resolves LABEL to ADDRESS.
+
+How OPTAB maps mnemonics to opcodes.
+
+If asked “how to improve”
+
+Robust parse_line (support comments ;, #, blank lines).
+
+Error list and abort on fatal errors.
+
+Support for numeric formats (hex with H or 0x) using int(token, 0) or custom parsing.
+
+Use dictionaries for intermediate_code records to be explicit (fields by name).
+
+Add file I/O to read assembly from a .asm file and write .obj or .lst files.
+
+Short exam script (what to say in 60–90 seconds)
+
+“This program is a simple two-pass assembler. In Pass-I it scans the source program, maintains a location counter locctr, records labels and their addresses in the symbol table SYMTAB, and produces an intermediate listing of (loc,label,opcode,operand) tuples. It treats each instruction as 3 bytes and updates locctr accordingly; directives like WORD, RESW, and RESB are handled by moving the location counter by the appropriate number of bytes. In Pass-II it reads the intermediate listing, looks up opcodes from OPTAB, converts the opcode from hex-string to decimal, resolves operand addresses using SYMTAB, and prints decimal machine code. The key data structures are OPTAB, SYMTAB, and intermediate_code. Limitations: parser is minimal, undefined symbols default to address 0 without an explicit error, and START handling in Pass-II is not output. These are easy to fix if needed.”
+
+Quick reference: What each variable contains at runtime (example values)
+
+OPTAB["ADD"] → "03" (string)
+
+SYMTAB["ALPHA"] → 1009 (int)
+
+intermediate_code[1] → (1000, 'FIRST', 'LOAD', 'ALPHA') (tuple)
+
+locctr updates: 1000 → 1003 → 1006 → 1009 → 1012 → 1015 → 1018

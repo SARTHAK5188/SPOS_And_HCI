@@ -1,0 +1,181 @@
+Part 2 — Line-by-line plain-English explanation (every line)
+
+I’ll show a short excerpt and explain each piece of it. Read slowly.
+
+Header / Description
+''' Write a program to solve Classical Problems of Synchronization using Mutex
+and Semaphore.
+'''
+
+
+Triple-quoted string used as a comment / docstring; does nothing at runtime except serve as documentation.
+
+Class and initialization
+class Synchronization:
+    def __init__(self):
+        self.buffer = [0] * 10  # Buffer size 10
+        self.mutex = 1
+        self.empty = 10
+        self.full = 0
+        self.in_index = 0
+        self.out_index = 0
+
+
+class Synchronization: starts a new object type.
+
+def __init__(self): defines the constructor — runs when you do Synchronization().
+
+self.buffer = [0] * 10: creates a list of 10 zeros — intended circular buffer.
+
+self.mutex = 1: a plain integer meant to model a binary semaphore (1 = unlocked).
+
+self.empty = 10: count of empty slots initially 10.
+
+self.full = 0: count of filled slots initially 0.
+
+self.in_index / self.out_index track where to write and where to read next (circular).
+
+wait / signal helpers
+    def wait(self, x):
+        if x > 0:
+            return x - 1
+        return x
+
+    def signal(self, x):
+        return x + 1
+
+
+wait(x) returns x-1 if positive, otherwise returns x. This is not a semaphore wait/blocked operation; it's just arithmetic.
+
+signal(x) returns x+1.
+
+Important: these functions do not block the caller, do not manipulate shared atomic state directly, and do not wake any waiting thread.
+
+producer method
+    def producer(self):
+        if self.empty > 0 and self.mutex == 1:
+            self.empty = self.wait(self.empty)
+            self.mutex = self.wait(self.mutex)
+            data = int(input("Data to be produced: "))
+            self.buffer[self.in_index] = data
+            self.in_index = (self.in_index + 1) % 10
+            self.mutex = self.signal(self.mutex)
+            self.full = self.signal(self.full)
+        else:
+            print("Buffer is full, cannot produce!")
+
+
+if self.empty > 0 and self.mutex == 1: checks preliminarily whether there is space and mutex is unlocked.
+
+Then it decrements empty and mutex via wait (pure arithmetic).
+
+Reads an integer data from user and writes it into buffer slot in_index.
+
+Advances in_index (wrap-around using % 10).
+
+Releases mutex (mutex = signal(mutex)) and increments full (full = signal(full)).
+
+Else prints buffer-full message.
+
+consumer method
+    def consumer(self):
+        if self.full > 0 and self.mutex == 1:
+            self.full = self.wait(self.full)
+            self.mutex = self.wait(self.mutex)
+            print("Data consumed is:", self.buffer[self.out_index])
+            self.out_index = (self.out_index + 1) % 10
+            self.mutex = self.signal(self.mutex)
+            self.empty = self.signal(self.empty)
+        else:
+            print("Buffer is empty, cannot consume!")
+
+
+Symmetric to producer: checks full>0 and mutex==1, then decrements full and mutex, reads from buffer[out_index], advances out_index, signals mutex and empty.
+
+main loop
+def main():
+    sync = Synchronization()
+    while True:
+        print("\n1. Producer\n2. Consumer\n3. Exit")
+        choice = input("Enter your choice: ")
+        if choice == '1':
+            sync.producer()
+        elif choice == '2':
+            sync.consumer()
+        elif choice == '3':
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice!")
+
+if __name__ == "__main__":
+    main()
+
+
+Creates a Synchronization instance and offers a menu. sync.producer() or sync.consumer() are called sequentially per user command. Nothing runs concurrently.
+
+Part 3 — Exactly what this program actually does (step-by-step numeric trace)
+
+We will run a concrete example and track variables exactly (digit-by-digit arithmetic). This is the single-threaded behavior you will see if you run the script and select options manually.
+
+Initial state right after sync = Synchronization():
+
+buffer = [0,0,0,0,0,0,0,0,0,0]
+
+mutex = 1
+
+empty = 10
+
+full = 0
+
+in_index = 0
+
+out_index = 0
+
+User chooses Producer (1) and types 42.
+
+if empty > 0 and mutex == 1 → 10 > 0 is True, 1 == 1 True → condition True.
+
+self.empty = self.wait(self.empty) → wait(10) returns 9 → empty = 9.
+
+self.mutex = self.wait(self.mutex) → wait(1) returns 0 → mutex = 0.
+
+data = int(input(...)) → user input 42 → data = 42.
+
+self.buffer[self.in_index] = data → buffer[0] = 42.
+
+self.in_index = (0 + 1) % 10 → in_index = 1.
+
+self.mutex = self.signal(self.mutex) → signal(0) returns 1 → mutex = 1.
+
+self.full = self.signal(self.full) → signal(0) returns 1 → full = 1.
+
+State after production:
+
+buffer has 42 at index 0, rest 0.
+
+empty = 9, full = 1, mutex = 1, in_index = 1, out_index = 0.
+
+User chooses Consumer (2).
+
+Check full > 0 and mutex == 1 → 1 > 0 True, 1 == 1 True.
+
+self.full = wait(self.full) → wait(1) → 0 → full = 0.
+
+self.mutex = wait(self.mutex) → wait(1) → 0 → mutex = 0.
+
+print(buffer[out_index]) → print 42.
+
+out_index = (0 + 1) % 10 → out_index = 1.
+
+mutex = signal(0) → mutex = 1.
+
+empty = signal(9) → empty = 10.
+
+State after consumption:
+
+buffer[0] still contains 42 (code didn't clear it), but out_index=1 means next read will pick buffer[1].
+
+empty = 10, full = 0.
+
+Note: because the code uses buffer as plain list of ints and never clears a consumed slot, consumed data remains in the list. But full/empty counts track availability in this single-threaded simulation.

@@ -1,0 +1,342 @@
+I’ll walk through each function and every important line with plain-language explanations.
+
+Module docstring
+"""
+FIFO Page Replacement Simulator (menu driven, simple)
+
+- Enter reference string as space-separated integers.
+- Enter number of frames (positive integer).
+- Program shows frame contents after each reference and total page faults.
+"""
+
+
+Multi-line string at the top (documentation). It doesn’t affect execution; it explains the program.
+
+Function run_fifo(pages, frames_count)
+def run_fifo(pages, frames_count):
+
+
+Defines a function named run_fifo that accepts two arguments:
+
+pages: a list of integers representing the page reference string.
+
+frames_count: positive integer — number of available page frames in memory.
+
+    frames = []
+
+
+Creates an empty list frames that will store the pages currently in frames (in their frame positions). Initially no frames are loaded.
+
+    page_faults = 0
+
+
+Initializes a counter page_faults to zero. A "page fault" happens when a referenced page is not in frames and must be loaded.
+
+    next_replace = 0  # index to replace next (circular)
+
+
+next_replace stores the index (0..frames_count-1) of the frame that will be replaced next according to FIFO order. It advances circularly.
+
+    print("\nFIFO Page Replacement Process:")
+
+
+Prints a header to indicate simulation start. \n creates a blank line before the header.
+
+    for page in pages:
+
+
+Loop over each page number in the pages list in the given order.
+
+        if page in frames:
+            print(f"Ref {page:>2} -> Frames: {frames} (hit)")
+
+
+Membership check page in frames: if the page is already in memory (frames), it’s a hit — no page fault, nothing changes.
+
+It prints the referenced page (Ref {page:>2} right-aligned width 2) and the current frames content and marks (hit).
+
+        else:
+            page_faults += 1
+
+
+If the page is not currently in frames, increment the page_faults counter by 1.
+
+            if len(frames) < frames_count:
+                frames.append(page)
+                print(f"Ref {page:>2} -> Frames: {frames} (fault, loaded)")
+
+
+If there are still empty frames (len(frames) < frames_count), simply append the new page to frames.
+
+This models filling empty frames from left to right. (Note: we append, so frame positions are 0..len-1.)
+
+Print that the page was loaded into frames and mark (fault, loaded).
+
+            else:
+                replaced = frames[next_replace]
+                frames[next_replace] = page
+                next_replace = (next_replace + 1) % frames_count
+                print(f"Ref {page:>2} -> Frames: {frames} (fault, replaced {replaced})")
+
+
+If all frames are full, perform FIFO replacement:
+
+replaced = frames[next_replace] — remember which page is getting replaced (for printing).
+
+frames[next_replace] = page — replace the frame at index next_replace with the new page.
+
+next_replace = (next_replace + 1) % frames_count — increment next_replace and wrap around using modulo so it remains within [0, frames_count-1]. This implements the circular FIFO queue.
+
+Print the new frames and indicate (fault, replaced X).
+
+After the loop ends (all references processed):
+
+    print(f"\nTotal page faults (FIFO): {page_faults}\n")
+    return page_faults
+
+
+Print total number of page faults.
+
+Return page_faults so caller can use or test the result.
+
+Function get_input()
+def get_input():
+
+
+Reads user input (reference string and frame count), validates, converts to integers, and returns (pages, frames_count) or (None, None) on error.
+
+    ref = input("Enter reference string (space-separated page numbers): ").strip()
+    if not ref:
+        print("Reference string cannot be empty.")
+        return None, None
+
+
+input(...).strip() prompts the user and strips whitespace. If the user enters nothing (ref is empty string), print an error and return None, None.
+
+    try:
+        pages = list(map(int, ref.split()))
+    except ValueError:
+        print("Invalid reference string: use integers separated by spaces.")
+        return None, None
+
+
+ref.split() splits the string on whitespace producing a list of tokens (strings). map(int, ...) attempts to convert each token to an integer. list(...) converts map to a list of ints. If any token isn't a valid integer, int() throws ValueError, which is caught and the function returns (None, None).
+
+    try:
+        frames_count = int(input("Enter number of frames: ").strip())
+        if frames_count <= 0:
+            print("Number of frames must be a positive integer.")
+            return None, None
+    except ValueError:
+        print("Invalid frame count: enter a positive integer.")
+        return None, None
+
+
+Prompts for frame count, converts to int, ensures it's > 0. If conversion fails or number is invalid, returns (None, None).
+
+    return pages, frames_count
+
+
+Returns the validated pages list and frames_count.
+
+Function main_menu()
+def main_menu():
+    while True:
+        print("\n=== FIFO Page Replacement Simulator ===")
+        print("1. Run FIFO algorithm")
+        print("2. Exit")
+        choice = input("Enter choice (1 or 2): ").strip()
+        if choice == "1":
+            pages, frames_count = get_input()
+            if pages is None:
+                continue
+            run_fifo(pages, frames_count)
+        elif choice == "2":
+            print("Goodbye!")
+            break
+        else:
+            print("Invalid choice. Enter 1 or 2.")
+
+
+Presents an infinite loop menu. If user chooses "1", get input and if valid call run_fifo. If "2", exit. Invalid choices print an error and loop.
+
+Program entry point
+if __name__ == "__main__":
+    main_menu()
+
+
+Standard guard: call main_menu() only if script is executed directly.
+
+What FIFO page replacement does (plain concept)
+
+Imagine memory has a small number of frames (slots). A program references pages in some order (reference string).
+
+If the page is already loaded (hit), nothing changes.
+
+If the page isn't loaded (fault), we must load it into a frame:
+
+If an empty frame exists, put it there.
+
+If all frames are full, remove the page that has been in memory the longest (first loaded among those currently in memory) — that’s FIFO — and replace it with the new page.
+
+The algorithm keeps a pointer next_replace that cycles through frame indices to indicate which frame holds the oldest loaded page (at replacement time).
+
+Example run — exact step-by-step with arithmetic and state updates
+
+We’ll run one clear example and show every step: frames, next_replace, page_faults, and printed output. I’ll use small numbers so you can manually verify.
+
+User inputs:
+
+Reference string: 7 0 1 2 0 3 0 4 2 (a common textbook example)
+
+Number of frames: 3
+
+So pages = [7,0,1,2,0,3,0,4,2], frames_count = 3.
+
+Initial state:
+
+frames = [] (empty)
+
+page_faults = 0
+
+next_replace = 0
+
+Now iterate each page:
+
+Reference 7
+
+Check if 7 in frames → False (frames empty).
+
+page_faults += 1 → page_faults = 1.
+
+len(frames) < frames_count → 0 < 3 true, so frames.append(7) → frames = [7].
+
+Print: Ref 7 -> Frames: [7] (fault, loaded)
+
+next_replace remains 0.
+
+Reference 0
+
+0 in frames? False.
+
+page_faults = 2.
+
+len(frames) < 3 → 1 < 3 true. frames.append(0) → frames = [7, 0].
+
+Print: Ref 0 -> Frames: [7, 0] (fault, loaded).
+
+next_replace still 0.
+
+Reference 1
+
+1 in frames? False.
+
+page_faults = 3.
+
+len(frames) < 3 → 2 < 3 true. frames.append(1) → frames = [7, 0, 1].
+
+Print: Ref 1 -> Frames: [7, 0, 1] (fault, loaded).
+
+Frames are now full. next_replace = 0 indicates frame 0 (holding 7) is the oldest.
+
+Reference 2
+
+2 in frames? False.
+
+page_faults = 4.
+
+len(frames) < 3? 3 < 3 false → must replace.
+
+replaced = frames[next_replace] → replaced = frames[0] = 7.
+
+frames[next_replace] = 2 → frames[0] = 2, so frames = [2, 0, 1].
+
+next_replace = (0 + 1) % 3 = 1.
+
+Print: Ref 2 -> Frames: [2, 0, 1] (fault, replaced 7).
+
+Reference 0
+
+0 in frames? True (frames [2,0,1]) → hit.
+
+page_faults remains 4.
+
+Print: Ref 0 -> Frames: [2, 0, 1] (hit).
+
+Reference 3
+
+3 in frames? False.
+
+page_faults = 5.
+
+len(frames) < 3? false → replace at next_replace = 1.
+
+replaced = frames[1] = 0.
+
+frames[1] = 3 → frames = [2, 3, 1].
+
+next_replace = (1 + 1) % 3 = 2.
+
+Print: Ref 3 -> Frames: [2, 3, 1] (fault, replaced 0).
+
+Reference 0
+
+0 in frames? False (frames [2,3,1]).
+
+page_faults = 6.
+
+Replace at next_replace = 2.
+
+replaced = frames[2] = 1.
+
+frames[2] = 0 → frames = [2, 3, 0].
+
+next_replace = (2 + 1) % 3 = 0.
+
+Print: Ref 0 -> Frames: [2, 3, 0] (fault, replaced 1).
+
+Reference 4
+
+4 in frames? False.
+
+page_faults = 7.
+
+Replace at next_replace = 0.
+
+replaced = frames[0] = 2.
+
+frames[0] = 4 → frames = [4, 3, 0].
+
+next_replace = (0 + 1) % 3 = 1.
+
+Print: Ref 4 -> Frames: [4, 3, 0] (fault, replaced 2).
+
+Reference 2
+
+2 in frames? False.
+
+page_faults = 8.
+
+Replace at next_replace = 1.
+
+replaced = frames[1] = 3.
+
+frames[1] = 2 → frames = [4, 2, 0].
+
+next_replace = (1 + 1) % 3 = 2.
+
+Print: Ref 2 -> Frames: [4, 2, 0] (fault, replaced 3).
+
+End of references:
+
+Print Total page faults (FIFO): 8.
+
+Return 8.
+
+You can verify the printed sequence and final frame states match the step-by-step above.
+
+Why FIFO behaves this way — intuition
+
+FIFO evicts pages in the order they were loaded — “first in, first out”. It does not look at future references or which pages are used frequently; it’s simple and cheap to implement (just a queue pointer).
+
+Because FIFO does not consider recency of use, it can suffer from Belady’s anomaly: increasing the number of frames can sometimes increase page faults (surprising but true for FIFO).

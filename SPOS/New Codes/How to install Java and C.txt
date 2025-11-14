@@ -1,0 +1,12 @@
+sudo apt install default-jdk
+java -version
+javac -version
+
+
+
+sudo apt update
+sudo apt install build-essential
+
+nano B1.c
+gcc B1.c -o B1
+./B1

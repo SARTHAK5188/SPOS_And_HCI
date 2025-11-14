@@ -1,0 +1,304 @@
+One-line summary
+
+Preemptive SJF (SRTF) always runs the ready process with the smallest remaining CPU time; whenever a new process arrives, the scheduler may preempt the currently running process if the newcomer has strictly smaller remaining time.
+
+Code walk-through — each part explained (straightforward English)
+
+I'll walk through your functions and key lines.
+
+get_input()
+try:
+    n = int(input("Enter number of processes: ").strip())
+    if n <= 0:
+        print("Number of processes must be positive.")
+        return None, 0
+except ValueError:
+    print("Please enter a valid integer.")
+    return None, 0
+
+
+Prompt for n (number of processes). strip() trims whitespace. int(...) converts to integer; ValueError if not numeric. On invalid input the function returns (None, 0) to signal the caller.
+
+processes = []
+for i in range(n):
+    while True:
+        try:
+            a = int(input(f"Arrival time for P{i}: ").strip())
+            b = int(input(f"Burst time for P{i}: ").strip())
+            if a < 0 or b <= 0:
+                print("Arrival must be >= 0 and Burst must be > 0. Try again.")
+                continue
+            break
+        except ValueError:
+            print("Please enter integers. Try again.")
+    processes.append({
+        "id": i,
+        "arrival": a,
+        "burst": b,
+        "original_burst": b,
+        "completion": 0,
+        "turnaround": 0,
+        "waiting": 0
+    })
+return processes, n
+
+
+For each process read arrival and burst (validated). Store a dictionary with:
+
+id, arrival, burst (this one will be decremented as time runs),
+
+original_burst (keep original value for metrics),
+
+completion, turnaround, waiting placeholders.
+
+compute_preemptive_sjf(processes, n)
+time = 0
+completed = 0
+execution_order = []  # per time-unit labels
+
+
+time is simulation clock (starts at 0).
+
+completed counts finished processes.
+
+execution_order records which process (or "IDLE") ran each unit time (used later to build a Gantt-like timeline).
+
+Main loop:
+
+while completed < n:
+    idx = -1
+    min_burst = None
+    for i, p in enumerate(processes):
+        if p["arrival"] <= time and p["burst"] > 0:
+            if min_burst is None or p["burst"] < min_burst:
+                min_burst = p["burst"]
+                idx = i
+
+
+On every time tick, scan all processes and choose the ready one (arrival <= time) with smallest burst remaining (p["burst"]). idx becomes the index of that process (or -1 if none ready).
+
+If a process is chosen:
+
+if idx != -1:
+    execution_order.append(f"P{processes[idx]['id']}")
+    processes[idx]["burst"] -= 1
+    time += 1
+    if processes[idx]["burst"] == 0:
+        processes[idx]["completion"] = time
+        processes[idx]["turnaround"] = time - processes[idx]["arrival"]
+        processes[idx]["waiting"] = processes[idx]["turnaround"] - processes[idx]["original_burst"]
+        completed += 1
+else:
+    execution_order.append("IDLE")
+    time += 1
+
+
+If idx != -1, we run that process for 1 unit (preemptive SJF schedules per small time slices; here discrete units are used).
+
+Decrement its remaining burst. If it reaches zero, record completion time, turnaround and waiting and increment completed.
+
+If no ready process, record "IDLE" and advance time by 1.
+
+Return the execution_order (list of labels per time unit). Later code builds a compressed Gantt timeline and prints per-process metrics.
+
+Important implementation notes
+
+The program runs in discrete time steps of length 1. That's typical for teaching problems.
+
+It does full scan of all processes each time unit → O(n * T) where T is total time. For small n/T that's fine.
+
+The code does not track response time (time from arrival to first CPU start). We'll add that in the improved version.
+
+Full worked example (unit-by-unit) — memorize this pattern
+
+Use this small example — it demonstrates preemption clearly and is easy to compute on paper:
+
+Processes:
+
+P0: arrival = 0, burst = 5
+
+P1: arrival = 1, burst = 3
+
+P2: arrival = 2, burst = 1
+
+We'll do each time unit, show chosen process, updates to remaining bursts, and metric updates. All arithmetic done explicitly.
+
+Start: time = 0, all burst are original: P0=5, P1=3, P2=1, completed = 0.
+
+t = 0 (time before executing unit 0)
+
+Ready processes: those with arrival <= 0 → {P0}.
+
+Smallest remaining burst among ready = P0 (5). So choose P0.
+
+Execute P0 for 1 unit:
+
+execution_order.append("P0").
+
+P0.remaining = 5 − 1 = 4.
+
+Increment time: time = 0 + 1 = 1.
+
+P0.remaining ≠ 0 → not completed yet.
+
+State after t=0 → t=1: P0 rem=4, P1 rem=3, P2 rem=1, completed=0.
+
+t = 1
+
+Now time = 1. Ready: processes with arrival ≤ 1 → P0 and P1 (P1 arrived at 1).
+
+Compare remaining bursts: P0 rem=4, P1 rem=3 → pick smallest: P1 (rem 3).
+
+Execute P1 one unit:
+
+Append "P1".
+
+P1.rem = 3 − 1 = 2.
+
+time = 1 + 1 = 2.
+
+P1 not finished yet.
+
+State after t=1 → t=2: P0 rem=4, P1 rem=2, P2 rem=1, completed=0.
+
+t = 2
+
+time = 2. Now P2 arrives at time 2, so ready set: P0, P1, P2.
+
+Remaining bursts: P0 rem4, P1 rem2, P2 rem1 → smallest is P2 (1).
+
+Execute P2 one unit:
+
+Append "P2".
+
+P2.rem = 1 − 1 = 0 → P2 finishes.
+
+time = 2 + 1 = 3.
+
+Since P2.rem == 0:
+
+P2.completion = time = 3
+
+P2.turnaround = completion − arrival = 3 − 2 = 1
+
+P2.waiting = turnaround − original_burst = 1 − 1 = 0
+
+completed = 0 + 1 = 1
+
+State after t=2 → t=3:
+
+P0 rem4, P1 rem2, P2 done (completion 3), completed=1.
+
+t = 3
+
+time = 3. Ready: P0 and P1 (P2 done).
+
+Remaining bursts: P0 rem4, P1 rem2 → choose P1 (2 < 4).
+
+Execute P1 for 1 unit:
+
+Append "P1".
+
+P1.rem = 2 − 1 = 1.
+
+time = 3 + 1 = 4.
+
+Not finished yet.
+
+State after t=3 → t=4: P0 rem4, P1 rem1, completed=1.
+
+t = 4
+
+time = 4. Ready: P0 and P1.
+
+Remaining bursts: P0 rem4, P1 rem1 → choose P1 (1 < 4).
+
+Execute P1 for 1 unit:
+
+Append "P1".
+
+P1.rem = 1 − 1 = 0 → P1 finished.
+
+time = 4 + 1 = 5.
+
+Record completion:
+
+P1.completion = 5
+
+P1.turnaround = 5 − 1 = 4
+
+P1.waiting = 4 − 3 = 1
+
+completed = 1 + 1 = 2
+
+State after t=4 → t=5: P0 rem4, P1 done (completion 5), P2 done, completed=2.
+
+t = 5
+
+time = 5. Only P0 remains with rem4; choose P0.
+
+Executions from t=5 to t=9: P0 must run 4 more units.
+
+At t=5: append "P0", rem=4−1=3, time→6
+
+t=6: append "P0", rem=3−1=2, time→7
+
+t=7: append "P0", rem=2−1=1, time→8
+
+t=8: append "P0", rem=1−1=0, time→9 → P0 finishes now.
+
+When P0.rem hits 0 on the last step:
+
+P0.completion = 9
+
+P0.turnaround = 9 − 0 = 9
+
+P0.waiting = 9 − 5 = 4 (original burst was 5)
+
+completed = 2 + 1 = 3 (all done because n=3)
+
+Final execution_order per time unit (labels for t=0..8):
+
+t0 → P0
+
+t1 → P1
+
+t2 → P2
+
+t3 → P1
+
+t4 → P1
+
+t5 → P0
+
+t6 → P0
+
+t7 → P0
+
+t8 → P0
+
+Final metrics:
+
+P0: completion 9, turnaround 9, waiting 4
+
+P1: completion 5, turnaround 4, waiting 1
+
+P2: completion 3, turnaround 1, waiting 0
+
+Check sums/averages:
+
+Sum completion = 9 + 5 + 3 = 17 → avg completion = 17 / 3 ≈ 5.6667
+
+Sum turnaround = 9 + 4 + 1 = 14 → avg turnaround = 14 / 3 ≈ 4.6667
+
+Sum waiting = 4 + 1 + 0 = 5 → avg waiting = 5 / 3 ≈ 1.6667
+
+Gantt-like compressed timeline (using build_timeline_from_execution):
+
+parts = ["P0", "P1", "P2", "P1", "P0"] but note consecutive identical labels are compressed, actually your compressor will merge consecutive P1s at t3 and t4 into single part? Let's see:
+
+Execution sequence: P0 | P1 | P2 | P1 | P1 | P0 | P0 | P0 | P0
+
+The compressor treats consecutive identical labels as one segment, so parts become ["P0","P1","P2","P1","P0"] with times where segments start: [0,1,2,3,5] and final time 9 → printed: P0 | P1 | P2 | P1 | P0 and times 0 1 2 3 5 9. (This matches how your build routine stores starts.)
+
+Memorize the unit-by-unit method — this is the core of SRTF.

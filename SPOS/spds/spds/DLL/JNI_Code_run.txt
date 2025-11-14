@@ -1,0 +1,37 @@
+sudo apt update
+sudo apt install default-jdk build-essential -y
+
+mkdir ~/jni-demo
+cd ~/jni-demo
+
+>>>Then put your B1.java and B1.c files inside this folder.
+javac B1.java
+javac -h . B1.java
+
+
+gcc -fPIC -I/usr/lib/jvm/default-java/include -I/usr/lib/jvm/default-java/include/linux -shared -o libB1.so B1.c
+
+java -Djava.library.path=. B1
+
+
+
+IF 4th COMMAND DOESNT WORK TRY ->
+
+gcc -shared -o libA3.so -fPIC -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" B1.c
+
+			OR
+
+Run this quick fix to find the right one:
+
+find /usr/lib/jvm -name jni.h
+
+
+You’ll get something like:
+
+/usr/lib/jvm/java-17-openjdk-amd64/include/jni.h
+
+
+Then copy that path (the folder before /include/jni.h) and run:
+
+gcc -fPIC -I/usr/lib/jvm/java-17-openjdk-amd64/include -I/usr/lib/jvm/java-17-openjdk-amd64/include/l
+

@@ -1,0 +1,60 @@
+3. DYNAMIC LINK LIBRARY (DLL)
+Core Concept
+Static Linking: Library code copied into executable at compile time. Executable is self-contained but large. Updates require recompilation.
+Dynamic Linking: Library kept separate. Program loads library at runtime. Executable is smaller, updates easier, code shared among programs.
+DLL Benefits
+Memory Sharing:
+
+One copy of DLL in memory serves multiple programs
+Saves RAM when many programs use same library
+
+Easy Updates:
+
+Update DLL file once, all programs benefit
+No need to recompile applications
+
+Modularity:
+
+System divided into logical components
+Each component in separate DLL
+Easier to maintain and update
+
+Plugin Architecture:
+
+Applications can load DLLs dynamically
+Add new features by adding DLL files
+
+How DLLs Work
+DLL Structure:
+
+Export Table: Lists functions available to other programs
+Code Section: Actual function implementations
+Import Table: Other DLLs this DLL depends on
+
+Loading Methods:
+Implicit Loading:
+
+DLL loaded automatically when program starts
+OS handles everything
+Program just calls DLL functions normally
+Simpler but less flexible
+
+Explicit Loading:
+
+Program manually loads DLL at runtime
+Get function pointers dynamically
+More control but more complex code
+Can handle missing DLLs gracefully
+
+Java Native Interface (JNI)
+Allows Java programs to call native C/C++ code in DLLs:
+
+Java declares native methods
+Implement those methods in C/C++, compile to DLL
+JVM loads DLL and links methods at runtime
+Used for platform-specific features or performance-critical code
+
+Challenges
+DLL Hell: Different programs need different DLL versions, conflicts arise
+Dependency Issues: DLL may depend on other DLLs, complex chains
+Security: Malicious DLLs can be injected or substituted
