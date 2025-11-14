@@ -1,0 +1,117 @@
+Step 1: Set Up the Development Environment
+First, ensure you have the necessary tools installed:
+
+# Update package list
+sudo apt update
+
+# Install Java Development Kit
+sudo apt install default-jdk
+
+# Install GCC compiler
+sudo apt install gcc
+
+# Install build essentials (optional but recommended)
+sudo apt install build-essential
+
+Step 2: Create the Java Class with Native Method
+Create a file called MathOperations.java:
+
+public class MathOperations {
+    // Load the native library
+    static {
+        System.loadLibrary("mathlib");
+    }
+    
+    // Declare native methods for mathematical operations
+    public native int add(int a, int b);
+    public native int subtract(int a, int b);
+    public native int multiply(int a, int b);
+    public native double divide(int a, int b);
+    public native double squareRoot(double a);
+    
+    // Test driver
+    public static void main(String[] args) {
+        MathOperations math = new MathOperations();
+        
+        int x = 10, y = 3;
+        
+        System.out.println("Addition: " + x + " + " + y + " = " + math.add(x, y));
+        System.out.println("Subtraction: " + x + " - " + y + " = " + math.subtract(x, y));
+        System.out.println("Multiplication: " + x + " * " + y + " = " + math.multiply(x, y));
+        System.out.println("Division: " + x + " / " + y + " = " + math.divide(x, y));
+        System.out.println("Square root of 25 = " + math.squareRoot(25.0));
+    }
+}
+
+Step 3: Compile the Java Class
+
+javac MathOperations.java
+
+Step 4: Generate C Header File
+
+javac MathOperations.java
+javah -jni MathOperations
+
+Step 5: Create the C Implementation File
+Create MathOperations.c:
+
+#include <jni.h>
+#include <math.h>
+#include "MathOperations.h"
+
+// Implementation of native method add
+JNIEXPORT jint JNICALL Java_MathOperations_add(JNIEnv *env, jobject obj, jint a, jint b) {
+    return a + b;
+}
+
+// Implementation of native method subtract
+JNIEXPORT jint JNICALL Java_MathOperations_subtract(JNIEnv *env, jobject obj, jint a, jint b) {
+    return a - b;
+}
+
+// Implementation of native method multiply
+JNIEXPORT jint JNICALL Java_MathOperations_multiply(JNIEnv *env, jobject obj, jint a, jint b) {
+    return a * b;
+}
+
+// Implementation of native method divide
+JNIEXPORT jdouble JNICALL Java_MathOperations_divide(JNIEnv *env, jobject obj, jint a, jint b) {
+    if (b == 0) {
+        return 0.0; // Handle division by zero
+    }
+    return (jdouble)a / (jdouble)b;
+}
+
+// Implementation of native method squareRoot
+JNIEXPORT jdouble JNICALL Java_MathOperations_squareRoot(JNIEnv *env, jobject obj, jdouble a) {
+    if (a < 0) {
+        return 0.0; // Handle negative numbers
+    }
+    return sqrt(a);
+}
+
+Step 6: Find Java Include Directories
+
+# Find Java home directory
+update-alternatives --list java
+		OR
+# Or use this to find include directories
+javac -version
+
+(
+Typically, the include directories are:
+
+/usr/lib/jvm/default-java/include/
+
+/usr/lib/jvm/default-java/include/linux/
+)
+
+Step 7: Compile the C Code into Shared Library
+
+# Compile the C code into shared library
+gcc -shared -fPIC -I/usr/lib/jvm/default-java/include -I/usr/lib/jvm/default-java/include/linux -o libmathlib.so MathOperations.c -lm
+
+Step 8: Run the Java Program
+
+# Run the program specifying the library path
+java -Djava.library.path=. MathOperations
